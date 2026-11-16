@@ -14,11 +14,11 @@ const int in4 = 8;
 const int trigPin = 9;
 const int echoPin = 10;
 
-// Motor Driver 2: NEMA 17 Stepper Motor (Wired to physical pins 2, 3, 6, 12)
+// Motor Driver 2: NEMA 17 Stepper Motor 
 const int stepsPerRevolution = 200;
 
-// Optimized H-Bridge mapping order for Stepper.h with L298N
-Stepper nemaMotor(stepsPerRevolution, 2, 3, 6, 12);
+// FIXED: Pin order updated to match your documentation (IN1=3, IN2=6, IN3=2, IN4=12)
+Stepper nemaMotor(stepsPerRevolution, 3, 6, 2, 12);
 
 // IR Remote OK button command hex value
 const unsigned long OK_COMMAND = 0x40;
@@ -42,10 +42,10 @@ void setup() {
   // Start IR Receiver
   IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
 
-  // Set a moderate, reliable RPM for the L298N driver
-  nemaMotor.setSpeed(75);
+  // Set a smooth, reliable RPM for the NEMA 17
+  nemaMotor.setSpeed(60);
 
-  Serial.println("SYSTEM BOOTED & READY - Stepper Optimized");
+  Serial.println("SYSTEM BOOTED & READY - Pin Order Fixed");
 }
 
 void loop() {
@@ -56,20 +56,20 @@ void loop() {
     Serial.print("Received Command: 0x");
     Serial.println(cmd, HEX);
 
-    // If the OK button is pressed, run the movement sequence and smooth stepper rotation
+    // If the OK button is pressed, run the movement sequence and spin for 10 seconds
     if (cmd == OK_COMMAND) {
       Serial.println("Executing: Robot Movement Sequence...");
       executeMovementSequence();
 
-      // Spin the NEMA 17 stepper smoothly in a full circle (one complete revolution)
-      Serial.println("Spinning Stepper Smoothly in a Full Circle (Clockwise)...");
-      spinSmoothCircle(stepsPerRevolution); 
-      delay(400);
+      // --- 10 SECONDS CLOCKWISE SPIN ---
+      Serial.println("Spinning Stepper Clockwise for 10 seconds...");
+      spinForSeconds(10.0, 1); // 1 = Clockwise
+      delay(500);
 
-      // Spin back in the opposite direction
-      Serial.println("Spinning Stepper Smoothly in a Full Circle (Counter-Clockwise)...");
-      spinSmoothCircle(-stepsPerRevolution); 
-      delay(400);
+      // --- TO CHANGE TO COUNTER-CLOCKWISE (CCW), JUST CHANGE 1 TO -1 BELOW ---
+      // Serial.println("Spinning Stepper Counter-Clockwise for 10 seconds...");
+      // spinForSeconds(10.0, -1); // -1 = Counter-Clockwise
+      // delay(500);
     } 
 
     Serial.println("Finished command, resuming IR...");
@@ -77,18 +77,19 @@ void loop() {
   }
 }
 
-// Custom wrapper function to break a full revolution into smaller, fluid increments
-// This prevents the driver from missing steps or locking up under continuous load.
-void spinSmoothCircle(int totalSteps) {
-  int direction = (totalSteps > 0) ? 1 : -1;
-  int absSteps = abs(totalSteps);
-  int batchSize = 10; // Move in small batches for smoother execution
+// Function to spin the stepper for a specific number of seconds
+// seconds: duration, direction: 1 for Clockwise, -1 for Counter-Clockwise
+void spinForSeconds(float seconds, int direction) {
+  int currentRpm = 60; // Must match nemaMotor.setSpeed() above
+  int stepsPerSecond = (currentRpm * stepsPerRevolution) / 60;
+  int totalSteps = (int)(stepsPerSecond * seconds);
+  
+  int batchSize = 10; // Move in small batches for smooth rotation
 
-  for (int i = 0; i < absSteps; i += batchSize) {
-    int stepsToTake = min(batchSize, absSteps - i);
+  for (int i = 0; i < totalSteps; i += batchSize) {
+    int stepsToTake = min(batchSize, totalSteps - i);
     nemaMotor.step(stepsToTake * direction);
-    // Tiny yield delay to let the L298N H-bridge transistors switch cleanly
-    delay(5); 
+    delay(5); // Tiny yield delay for driver switching
   }
 }
 
